@@ -32,6 +32,8 @@ Bridges the sensory gap in ecological AI by allowing language models and multimo
 | `get_sonogram_urls` | Retrieve spectrogram image URLs for multimodal visual sound inspection. |
 | `get_species_vocalization_profile` | Aggregate a species' acoustic repertoire across song, call, and alarm vocalizations. |
 | `compare_species_vocalizations` | Compare high-grade recordings and spectrograms for two similar species. |
+| `download_audio_clip` | Download high-fidelity wildlife audio file locally for playback and analysis. |
+| `get_recordist_profile` | Retrieve recordist portfolio, contribution statistics, and sampled recordings. |
 
 ---
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import tempfile
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,6 +33,10 @@ class XenoCantoClient:
         vocalization_type: str | None = None,
         quality_rating: str | None = None,
         taxonomic_group: str | None = None,
+        life_stage: str | None = None,
+        sex: str | None = None,
+        sound_method: str | None = None,
+        recordist: str | None = None,
         limit: int = 25,
     ) -> dict[str, Any]:
         """Search bioacoustic recordings with taxonomic, geographical, and acoustic filters."""
@@ -47,6 +53,14 @@ class XenoCantoClient:
             query_parts.append(f"q:{quality_rating.strip().upper()}")
         if taxonomic_group:
             query_parts.append(f"grp:{taxonomic_group.strip().lower()}")
+        if life_stage:
+            query_parts.append(f'stage:"{life_stage.strip().lower()}"')
+        if sex:
+            query_parts.append(f'sex:"{sex.strip().lower()}"')
+        if sound_method:
+            query_parts.append(f'method:"{sound_method.strip().lower()}"')
+        if recordist:
+            query_parts.append(f'rec:"{recordist.strip()}"')
 
         full_query = " ".join(query_parts).strip() or "q:A"
         data = self._request("/recordings", {"query": full_query})
@@ -149,6 +163,73 @@ class XenoCantoClient:
             "vocalization_types": vocal_counts,
             "featured_recordings": featured,
             "primary_vocalizations": list(vocal_counts.keys())[:5],
+        }
+
+    def download_audio_clip(
+        self,
+        recording_id: str,
+        target_dir: str | None = None,
+        filename: str | None = None,
+    ) -> dict[str, Any]:
+        """Download high-fidelity wildlife audio file locally for playback and analysis."""
+        details = self.get_recording_details(recording_id)
+        audio_url = details.get("audio_url")
+        if not audio_url:
+            raise XenoCantoError(f"No audio download URL available for XC{recording_id}.")
+
+        out_dir = Path(target_dir) if target_dir else Path(tempfile.gettempdir())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        file_name = filename or f"XC{recording_id}.mp3"
+        out_path = out_dir / file_name
+
+        with httpx.Client(
+            timeout=self.timeout, transport=self.transport, follow_redirects=True
+        ) as client:
+            try:
+                resp = client.get(audio_url)
+                resp.raise_for_status()
+                out_path.write_bytes(resp.content)
+            except (httpx.HTTPError, OSError) as exc:
+                raise XenoCantoError(
+                    f"Failed to download audio for XC{recording_id}: {exc}"
+                ) from exc
+
+        return {
+            "recording_id": str(recording_id),
+            "file_path": str(out_path.resolve()),
+            "file_size_bytes": out_path.stat().st_size,
+            "mime_type": "audio/mpeg",
+            "species": details.get("scientific_name"),
+            "common_name": details.get("common_name"),
+            "vocalization_type": details.get("vocalization_type"),
+            "quality": details.get("quality"),
+            "audio_url": audio_url,
+        }
+
+    def get_recordist_profile(self, recordist_name: str, limit: int = 25) -> dict[str, Any]:
+        """Retrieve recordist portfolio, contribution statistics, and sampled recordings."""
+        res = self.search_recordings(recordist=recordist_name, limit=limit)
+        recordings = res.get("recordings", [])
+        species_counts: dict[str, int] = {}
+        countries: set[str] = set()
+
+        for r in recordings:
+            sp = r.get("scientific_name")
+            if sp:
+                species_counts[sp] = species_counts.get(sp, 0) + 1
+            cnt = r.get("country")
+            if cnt:
+                countries.add(cnt)
+
+        top_species = sorted(species_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        return {
+            "recordist": recordist_name,
+            "total_recordings": res.get("total_recordings", len(recordings)),
+            "total_species_recorded": res.get("total_species", len(species_counts)),
+            "countries_visited": sorted(countries),
+            "top_recorded_species": [{"species": s[0], "count": s[1]} for s in top_species],
+            "sample_recordings": recordings,
         }
 
     def _request(self, path: str, params: dict[str, Any]) -> Any:

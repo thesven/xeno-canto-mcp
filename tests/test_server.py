@@ -10,6 +10,9 @@ from xeno_canto_mcp.server import create_server
 @pytest.fixture
 def mock_client() -> XenoCantoClient:
     def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        if "100/download" in url_str:
+            return httpx.Response(200, content=b"audio-bytes-for-robin")
         return httpx.Response(
             200,
             json={
@@ -24,6 +27,8 @@ def mock_client() -> XenoCantoClient:
                         "type": "song",
                         "q": "A",
                         "loc": "Central Park",
+                        "rec": "Jane Naturalist",
+                        "cnt": "United States",
                         "file": "https://xeno-canto.org/100/download",
                         "sono": {"full": "https://xeno-canto.org/sono.png"},
                     }
@@ -54,6 +59,8 @@ async def test_server_tools(mock_client: XenoCantoClient) -> None:
     assert "get_sonogram_urls" in tool_names
     assert "compare_species_vocalizations" in tool_names
     assert "get_species_vocalization_profile" in tool_names
+    assert "download_audio_clip" in tool_names
+    assert "get_recordist_profile" in tool_names
 
     res = await server.call_tool("search_recordings", {"species": "Turdus migratorius"})
     assert "American Robin" in res.content[0].text
@@ -79,6 +86,12 @@ async def test_server_tools(mock_client: XenoCantoClient) -> None:
     )
     assert "American Robin" in res.content[0].text or "recordings" in res.content[0].text
 
+    res = await server.call_tool("download_audio_clip", {"recording_id": "100"})
+    assert "Downloaded XC100" in res.content[0].text
+
+    res = await server.call_tool("get_recordist_profile", {"recordist_name": "Jane Naturalist"})
+    assert "Recordist profile for Jane Naturalist" in res.content[0].text
+
 
 @pytest.mark.asyncio
 async def test_server_tool_errors(failing_client: XenoCantoClient) -> None:
@@ -102,4 +115,10 @@ async def test_server_tool_errors(failing_client: XenoCantoClient) -> None:
     assert "failed" in res.content[0].text
 
     res = await server.call_tool("get_species_vocalization_profile", {"species_name": "Bad"})
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool("download_audio_clip", {"recording_id": "Bad"})
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool("get_recordist_profile", {"recordist_name": "Bad"})
     assert "failed" in res.content[0].text

@@ -210,3 +210,130 @@ def test_error_handling() -> None:
     client2 = XenoCantoClient(transport=httpx.MockTransport(handler_bad_json))
     with pytest.raises(XenoCantoError, match="Invalid JSON"):
         client2.search_recordings("test")
+
+
+def test_search_extended_filters() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        q = request.url.params.get("query", "")
+        assert 'stage:"adult"' in q
+        assert 'sex:"male"' in q
+        assert 'method:"field"' in q
+        assert 'rec:"John"' in q
+        return httpx.Response(
+            200,
+            json={
+                "numRecordings": "1",
+                "numSpecies": "1",
+                "recordings": [
+                    {
+                        "id": "777",
+                        "gen": "Corvus",
+                        "sp": "corax",
+                        "en": "Common Raven",
+                        "type": "call",
+                    }
+                ],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = XenoCantoClient(transport=transport)
+    res = client.search_recordings(
+        life_stage="adult", sex="male", sound_method="field", recordist="John"
+    )
+    assert res["total_recordings"] == 1
+    assert res["recordings"][0]["scientific_name"] == "Corvus corax"
+
+
+def test_download_audio_clip(tmp_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        if "recordings" in url_str:
+            return httpx.Response(
+                200,
+                json={
+                    "numRecordings": "1",
+                    "recordings": [
+                        {
+                            "id": "555",
+                            "gen": "Cyanocitta",
+                            "sp": "cristata",
+                            "en": "Blue Jay",
+                            "type": "call",
+                            "file": "https://xeno-canto.org/555/download",
+                        }
+                    ],
+                },
+            )
+        if "555/download" in url_str:
+            return httpx.Response(200, content=b"fake-mp3-bytes-12345")
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    client = XenoCantoClient(transport=transport)
+
+    res = client.download_audio_clip("555", target_dir=str(tmp_path))
+    assert res["recording_id"] == "555"
+    assert res["file_size_bytes"] == len(b"fake-mp3-bytes-12345")
+    assert res["species"] == "Cyanocitta cristata"
+    assert (tmp_path / "XC555.mp3").read_bytes() == b"fake-mp3-bytes-12345"
+
+    # Test error downloading audio
+    def failing_download_handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        if "recordings" in url_str:
+            return httpx.Response(
+                200,
+                json={
+                    "recordings": [
+                        {
+                            "id": "556",
+                            "gen": "Cyanocitta",
+                            "sp": "cristata",
+                            "file": "https://xeno-canto.org/556/download",
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(500, text="Download Error")
+
+    failing_client = XenoCantoClient(transport=httpx.MockTransport(failing_download_handler))
+    with pytest.raises(XenoCantoError, match="Failed to download audio"):
+        failing_client.download_audio_clip("556", target_dir=str(tmp_path))
+
+
+def test_get_recordist_profile() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert 'rec:"Jane Doe"' in request.url.params.get("query", "")
+        return httpx.Response(
+            200,
+            json={
+                "numRecordings": "2",
+                "numSpecies": "2",
+                "recordings": [
+                    {
+                        "id": "1",
+                        "gen": "Turdus",
+                        "sp": "migratorius",
+                        "cnt": "Canada",
+                        "rec": "Jane Doe",
+                    },
+                    {
+                        "id": "2",
+                        "gen": "Poecile",
+                        "sp": "atricapillus",
+                        "cnt": "USA",
+                        "rec": "Jane Doe",
+                    },
+                ],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = XenoCantoClient(transport=transport)
+    profile = client.get_recordist_profile("Jane Doe")
+    assert profile["recordist"] == "Jane Doe"
+    assert profile["total_recordings"] == 2
+    assert "Canada" in profile["countries_visited"]
+    assert "USA" in profile["countries_visited"]
+    assert len(profile["top_recorded_species"]) == 2

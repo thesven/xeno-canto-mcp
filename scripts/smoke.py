@@ -78,6 +78,8 @@ async def main() -> None:
                 "get_sonogram_urls",
                 "compare_species_vocalizations",
                 "get_species_vocalization_profile",
+                "download_audio_clip",
+                "get_recordist_profile",
             }
             missing = expected_tools - tool_names
             assert expected_tools.issubset(tool_names), f"Missing tools: {missing}"

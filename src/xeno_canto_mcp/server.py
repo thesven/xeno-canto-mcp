@@ -57,6 +57,10 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
         vocalization_type: str | None = None,
         quality_rating: str | None = None,
         taxonomic_group: str | None = None,
+        life_stage: str | None = None,
+        sex: str | None = None,
+        sound_method: str | None = None,
+        recordist: str | None = None,
         limit: int = 25,
     ) -> dict[str, Any]:
         """Search wildlife audio recordings by species, geography, vocalization, rating, or taxa."""
@@ -68,6 +72,10 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
                 vocalization_type=vocalization_type,
                 quality_rating=quality_rating,
                 taxonomic_group=taxonomic_group,
+                life_stage=life_stage,
+                sex=sex,
+                sound_method=sound_method,
+                recordist=recordist,
                 limit=limit,
             )
             res["summary"] = _format_recordings_summary(res["recordings"])
@@ -164,6 +172,39 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
             return {"profile": profile, "summary": summary}
         except XenoCantoError as exc:
             return {"error": str(exc), "summary": f"Profile generation failed: {exc}"}
+
+    @server.tool()
+    def download_audio_clip(
+        recording_id: str,
+        target_dir: str | None = None,
+        filename: str | None = None,
+    ) -> dict[str, Any]:
+        """Download high-fidelity wildlife audio file locally for playback and analysis."""
+        try:
+            download_res = api.download_audio_clip(
+                recording_id=recording_id, target_dir=target_dir, filename=filename
+            )
+            summary = (
+                f"Downloaded XC{recording_id} ({download_res.get('species')}) "
+                f"to {download_res.get('file_path')} ({download_res.get('file_size_bytes')} bytes)"
+            )
+            return {"download": download_res, "summary": summary}
+        except XenoCantoError as exc:
+            return {"error": str(exc), "summary": f"Audio download failed: {exc}"}
+
+    @server.tool()
+    def get_recordist_profile(recordist_name: str, limit: int = 25) -> dict[str, Any]:
+        """Retrieve recordist portfolio, contribution statistics, and sampled recordings."""
+        try:
+            profile = api.get_recordist_profile(recordist_name=recordist_name, limit=limit)
+            summary = (
+                f"Recordist profile for {recordist_name}: "
+                f"{profile.get('total_recordings')} recordings across "
+                f"{len(profile.get('countries_visited', []))} countries"
+            )
+            return {"profile": profile, "summary": summary}
+        except XenoCantoError as exc:
+            return {"error": str(exc), "summary": f"Recordist profile failed: {exc}"}
 
     return server
 
