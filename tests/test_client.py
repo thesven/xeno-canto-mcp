@@ -151,6 +151,51 @@ def test_compare_species_vocalizations() -> None:
     assert comp["species_b"]["name"] == "Species two"
 
 
+def test_taxonomic_group_and_vocalization_profile() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        q = request.url.params.get("query", "")
+        if "grp:frogs" in q:
+            return httpx.Response(
+                200,
+                json={
+                    "numRecordings": "1",
+                    "recordings": [
+                        {
+                            "id": "99",
+                            "gen": "Hyla",
+                            "sp": "versicolor",
+                            "type": "call",
+                            "group": "frogs",
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "numRecordings": "3",
+                "recordings": [
+                    {"id": "10", "gen": "Turdus", "sp": "migratorius", "type": "song"},
+                    {"id": "11", "gen": "Turdus", "sp": "migratorius", "type": "call"},
+                    {"id": "12", "gen": "Turdus", "sp": "migratorius", "type": "alarm call"},
+                ],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = XenoCantoClient(transport=transport)
+
+    # Test taxonomic group
+    res_frogs = client.search_recordings(taxonomic_group="frogs")
+    assert res_frogs["recordings"][0]["group"] == "frogs"
+
+    # Test vocalization profile
+    prof = client.get_species_vocalization_profile("Turdus migratorius")
+    assert prof["species"] == "Turdus migratorius"
+    assert "song" in prof["vocalization_types"]
+    assert len(prof["featured_recordings"]) == 3
+
+
 def test_error_handling() -> None:
     def handler_500(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="Server Error")

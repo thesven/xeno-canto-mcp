@@ -30,6 +30,7 @@ class XenoCantoClient:
         country: str | None = None,
         vocalization_type: str | None = None,
         quality_rating: str | None = None,
+        taxonomic_group: str | None = None,
         limit: int = 25,
     ) -> dict[str, Any]:
         """Search bioacoustic recordings with taxonomic, geographical, and acoustic filters."""
@@ -37,7 +38,6 @@ class XenoCantoClient:
         if query:
             query_parts.append(query.strip())
         if species:
-            # If scientific name like "Turdus migratorius", can pass directly or tag
             query_parts.append(f'"{species.strip()}"')
         if country:
             query_parts.append(f'cnt:"{country.strip()}"')
@@ -45,6 +45,8 @@ class XenoCantoClient:
             query_parts.append(f'type:"{vocalization_type.strip()}"')
         if quality_rating:
             query_parts.append(f"q:{quality_rating.strip().upper()}")
+        if taxonomic_group:
+            query_parts.append(f"grp:{taxonomic_group.strip().lower()}")
 
         full_query = " ".join(query_parts).strip() or "q:A"
         data = self._request("/recordings", {"query": full_query})
@@ -123,6 +125,30 @@ class XenoCantoClient:
                 "recordings": res_b.get("recordings", []),
             },
             "vocalization_type": vocalization_type,
+        }
+
+    def get_species_vocalization_profile(self, species_name: str) -> dict[str, Any]:
+        """Aggregate a species' acoustic repertoire across song, call, and alarm vocalizations."""
+        res = self.search_recordings(species=species_name, limit=50)
+        recordings = res.get("recordings", [])
+
+        vocal_counts: dict[str, int] = {}
+        featured: list[dict[str, Any]] = []
+        seen_types = set()
+
+        for r in recordings:
+            v_type = (r.get("vocalization_type") or "sound").lower()
+            vocal_counts[v_type] = vocal_counts.get(v_type, 0) + 1
+            if v_type not in seen_types and len(featured) < 5:
+                seen_types.add(v_type)
+                featured.append(r)
+
+        return {
+            "species": species_name,
+            "total_recordings_sampled": len(recordings),
+            "vocalization_types": vocal_counts,
+            "featured_recordings": featured,
+            "primary_vocalizations": list(vocal_counts.keys())[:5],
         }
 
     def _request(self, path: str, params: dict[str, Any]) -> Any:

@@ -56,9 +56,10 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
         country: str | None = None,
         vocalization_type: str | None = None,
         quality_rating: str | None = None,
+        taxonomic_group: str | None = None,
         limit: int = 25,
     ) -> dict[str, Any]:
-        """Search wildlife audio recordings by species, geography, vocalization type, or rating."""
+        """Search wildlife audio recordings by species, geography, vocalization, rating, or taxa."""
         try:
             res = api.search_recordings(
                 query=query,
@@ -66,6 +67,7 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
                 country=country,
                 vocalization_type=vocalization_type,
                 quality_rating=quality_rating,
+                taxonomic_group=taxonomic_group,
                 limit=limit,
             )
             res["summary"] = _format_recordings_summary(res["recordings"])
@@ -148,6 +150,20 @@ def create_server(client: XenoCantoClient | None = None) -> MCPServer:
             return {"comparison": comp, "summary": summary}
         except XenoCantoError as exc:
             return {"error": str(exc), "summary": f"Comparison failed: {exc}"}
+
+    @server.tool()
+    def get_species_vocalization_profile(species_name: str) -> dict[str, Any]:
+        """Aggregate a species' acoustic repertoire across song, call, and alarm vocalizations."""
+        try:
+            profile = api.get_species_vocalization_profile(species_name=species_name)
+            types_str = ", ".join(profile.get("primary_vocalizations", [])) or "None reported"
+            summary = (
+                f"Vocalization profile for {species_name}: "
+                f"{profile.get('total_recordings_sampled')} recordings sampled across {types_str}"
+            )
+            return {"profile": profile, "summary": summary}
+        except XenoCantoError as exc:
+            return {"error": str(exc), "summary": f"Profile generation failed: {exc}"}
 
     return server
 

@@ -14,7 +14,8 @@ Bridges the sensory gap in ecological AI by allowing language models and multimo
 
 - **Global Bioacoustics Catalog**: Search over 800,000+ wildlife sound recordings covering birds, bats, amphibians, and vocalizing insects worldwide.
 - **Multimodal Sonogram & Spectrogram Inspection**: Exposes direct URLs to generated frequency-time spectrogram images (`sono.full`, `sono.med`, `sono.small`) for visual sound analysis.
-- **Vocalization Type Filtering**: Easily query by vocal behavior (`song`, `alarm call`, `flight call`, `drumming`, `dawn chorus`).
+- **Species Vocalization Profiler**: Aggregate a species' acoustic repertoire across songs, calls, and alarms.
+- **Vocalization Type & Taxa Filtering**: Easily query by vocal behavior (`song`, `alarm call`, `flight call`) and taxonomic groups (`birds`, `frogs`, `bats`, `grasshoppers`).
 - **Quality-Filtered Audios**: Filter by recording quality grades (`A` through `E`) to guarantee high-fidelity audio evidence.
 - **Acoustic Comparison Engine**: Compare two vocalizing species side-by-side with high-grade reference recordings.
 - **Geographic Proximity Queries**: Find audio recorded in a specific area via bounding coordinates.
@@ -25,10 +26,11 @@ Bridges the sensory gap in ecological AI by allowing language models and multimo
 
 | Tool | Description |
 | :--- | :--- |
-| `search_recordings` | Search wildlife audio recordings by species, country, vocalization type, or quality. |
+| `search_recordings` | Search wildlife audio recordings by species, country, vocalization type, quality, or taxa. |
 | `search_recordings_nearby` | Search recordings within a bounding box around GPS coordinates and radius. |
 | `get_recording_details` | Retrieve complete metadata, audio stream MP3 URL, and sonograms for an XC recording. |
 | `get_sonogram_urls` | Retrieve spectrogram image URLs for multimodal visual sound inspection. |
+| `get_species_vocalization_profile` | Aggregate a species' acoustic repertoire across song, call, and alarm vocalizations. |
 | `compare_species_vocalizations` | Compare high-grade recordings and spectrograms for two similar species. |
 
 ---

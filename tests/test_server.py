@@ -53,6 +53,7 @@ async def test_server_tools(mock_client: XenoCantoClient) -> None:
     assert "get_recording_details" in tool_names
     assert "get_sonogram_urls" in tool_names
     assert "compare_species_vocalizations" in tool_names
+    assert "get_species_vocalization_profile" in tool_names
 
     res = await server.call_tool("search_recordings", {"species": "Turdus migratorius"})
     assert "American Robin" in res.content[0].text
@@ -72,6 +73,11 @@ async def test_server_tools(mock_client: XenoCantoClient) -> None:
         "compare_species_vocalizations", {"species_a": "Robin", "species_b": "Thrush"}
     )
     assert "Comparison" in res.content[0].text
+
+    res = await server.call_tool(
+        "get_species_vocalization_profile", {"species_name": "Turdus migratorius"}
+    )
+    assert "American Robin" in res.content[0].text or "recordings" in res.content[0].text
 
 
 @pytest.mark.asyncio
@@ -93,4 +99,7 @@ async def test_server_tool_errors(failing_client: XenoCantoClient) -> None:
     res = await server.call_tool(
         "compare_species_vocalizations", {"species_a": "A", "species_b": "B"}
     )
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool("get_species_vocalization_profile", {"species_name": "Bad"})
     assert "failed" in res.content[0].text
